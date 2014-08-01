@@ -1,0 +1,54 @@
+define(["app", "entities/userAccount"], function (BrewOptix) {
+    BrewOptix.module("UserAccountApp", function (UserAccountApp, BrewOptix, Backbone, Marionette, $, _) {
+
+        UserAccountApp.Router = Marionette.AppRouter.extend({
+            appRoutes: {
+                "userAccounts(/filter/criterion::criterion)": "showUserAccounts",
+                "userAccounts/:id": "showDetails"
+            }
+        });
+
+        var api = {
+            showUserAccounts: function (criterion) {
+                require(["apps/userAccount/list/list_controller"], function (ListController) {
+                    BrewOptix.makeIconActive("userAccounts-main");
+                    ListController.showUserAccounts(criterion);
+                });
+            },
+            showDetails: function (id) {
+                require(["apps/userAccount/details/details_controller"], function (DetailsController) {
+                    BrewOptix.makeIconActive("userAccounts-main");
+                    DetailsController.showDetails(id);
+                });
+            },
+            editUserAccount: function (userAccount) {
+                require(["apps/userAccount/list/list_controller"], function (ListController) {
+                    BrewOptix.makeIconActive("userAccounts-main");
+                    ListController.editUserAccount(userAccount);
+                });
+            }
+        };
+
+        BrewOptix.on("userAccount:showUserAccounts", function (criterion) {
+            BrewOptix.navigate("userAccounts");
+            api.showUserAccounts(criterion);
+        });
+
+        BrewOptix.on("userAccount:showDetails", function (id) {
+            BrewOptix.navigate("userAccounts/" + id);
+            api.showDetails(id);
+        });
+        
+        BrewOptix.on('userAccount:edit', function (userAccount) {
+            api.editUserAccount(userAccount);
+        });
+
+        BrewOptix.addInitializer(function () {
+            new UserAccountApp.Router({
+                controller: api
+            });
+        });
+    });
+
+    return BrewOptix.UserAccountApp;
+});

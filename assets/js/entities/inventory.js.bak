@@ -1,0 +1,296 @@
+﻿define(["app", "entities/weeklySales", "entities/brand", "entities/batch", "entities/packageType",
+    "entities/packageMaterial", "entities/brandOnHand", "entities/packageMaterialOnHand"], function (BrewOptix) {
+    BrewOptix.module("Entities", function(Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.WeeklyBeerInventory = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("WeeklyBeerInventory"),
+            idAttribute: "EntityID"
+        });
+
+        Entities.WeeklyBeerInventoryCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("WeeklyBeerInventory"),
+            model: Entities.WeeklyBeerInventory,
+            comparator: "WeekDate"
+        });
+
+        var weeklyBeerInventoryLookup = {};
+        var weeklyBeerBrandPackageLookup = {};
+
+        Entities.WeeklyPackageMaterialInventory = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("WeeklyPackageMaterialInventory"),
+            idAttribute: "EntityID"
+        });
+
+        Entities.WeeklyPackageMaterialInventoryCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("WeeklyPackageMaterialInventory"),
+            model: Entities.WeeklyPackageMaterialInventory,
+            comparator: "WeekDate"
+        });
+
+        var weeklyPackageMaterialInventoryLookup = {};
+        var weeklyPackageMaterialBrandLookup = {};
+
+        var api = {
+            getWeeklyBeerInventory: function () {
+                var defer = $.Deferred();
+
+                var weeklyBeerInventory = new Entities.WeeklyBeerInventoryCollection();
+
+                weeklyBeerInventory.fetch({
+                    success: function (data) {
+                        _.each(weeklyBeerInventory.models, function (inventory) {
+                            var weekDate = inventory.get('WeekDate').substring(0, 10);
+                            var now = new Date(weekDate);
+                            var weekDateUtc = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+                            
+                            if (timeIncludeFilter.dateIncluded(weekDateUtc)) {
+                                var brandId = inventory.get('BrandID');
+                                var packageTypeId = inventory.get('PackageTypeID');
+
+                                if (weeklyBeerInventoryLookup[weekDate] === undefined) {
+                                    weeklyBeerInventoryLookup[weekDate] = {};
+                                }
+
+                                if (weeklyBeerInventoryLookup[weekDate][brandId] === undefined) {
+                                    weeklyBeerInventoryLookup[weekDate][brandId] = {};
+                                }
+
+                                weeklyBeerInventoryLookup[weekDate][brandId][packageTypeId] = inventory;
+
+                                if (weeklyBeerBrandPackageLookup[brandId] === undefined) {
+                                    weeklyBeerBrandPackageLookup[brandId] = {};
+                                }
+                                if (weeklyBeerBrandPackageLookup[brandId][packageTypeId] === undefined) {
+                                    weeklyBeerBrandPackageLookup[brandId][packageTypeId] = true;
+                                }
+                            }
+                        });
+
+                        defer.resolve(data);
+                    }
+                });
+
+                return defer.promise();
+            },
+
+            getWeeklyPackageMaterialInventory: function () {
+                var defer = $.Deferred();
+
+                var weeklyPackageMaterialInventory = new Entities.WeeklyPackageMaterialInventoryCollection();
+
+                weeklyPackageMaterialInventory.fetch({
+                    success: function (data) {
+                        _.each(weeklyPackageMaterialInventory.models, function (inventory) {
+                            var weekDate = inventory.get('WeekDate').substring(0, 10);
+                            var brandSpecific = inventory.get('BrandSpecific');
+                            var now = new Date(weekDate);
+                            var weekDateUtc = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
+                            if (timeIncludeFilter.dateIncluded(weekDateUtc)) {
+                                var brandId = inventory.get('BrandID');
+                                var packageMaterialId = inventory.get('PackageMaterialID');
+
+                                if (weeklyPackageMaterialInventoryLookup[weekDate] === undefined) {
+                                    weeklyPackageMaterialInventoryLookup[weekDate] = {};
+                                }
+
+                                if (weeklyPackageMaterialInventoryLookup[weekDate][packageMaterialId] === undefined) {
+                                    weeklyPackageMaterialInventoryLookup[weekDate][packageMaterialId] = {};
+                                }
+
+                                weeklyPackageMaterialInventoryLookup[weekDate][packageMaterialId][brandId] = inventory;
+
+                                if (!brandSpecific) {
+                                    weeklyPackageMaterialInventoryLookup[weekDate][packageMaterialId] = inventory;
+                                }
+
+                                if (weeklyPackageMaterialBrandLookup[brandId] === undefined) {
+                                    weeklyPackageMaterialBrandLookup[brandId] = {};
+                                }
+                                if (weeklyPackageMaterialBrandLookup[brandId][packageMaterialId] === undefined) {
+                                    weeklyPackageMaterialBrandLookup[brandId][packageMaterialId] = true;
+                                }
+                                
+                            }
+                        });
+
+                        defer.resolve(data);
+                    }
+                });
+
+                return defer.promise();
+            }
+        };
+
+        BrewOptix.reqres.setHandler("weeklyBeerInventory:entities", function () { return api.getWeeklyBeerInventory(); });
+
+        BrewOptix.reqres.setHandler("weeklyBeerInventory:displayBrand", function (brandId) {
+            return weeklyBeerBrandPackageLookup[brandId] !== undefined;
+        });
+
+        BrewOptix.reqres.setHandler("weeklyBeerInventory:displayPackageType", function (brandId, packageTypeId) {
+            if (weeklyBeerBrandPackageLookup[brandId] === undefined) {
+                return false;
+            }
+            if (weeklyBeerBrandPackageLookup[brandId][packageTypeId] === undefined) {
+                return false;
+            }
+            return true;
+        });
+
+        BrewOptix.reqres.setHandler("weeklyBeerInventory:entity", function (weekDate, brandId, packageTypeId) {
+            weekDate = BrewOptix.getStringFromDate(weekDate);
+            if (weeklyBeerInventoryLookup[weekDate] === undefined) {
+                return undefined;
+            }
+            if (weeklyBeerInventoryLookup[weekDate][brandId] === undefined) {
+                return undefined;
+            }
+            return weeklyBeerInventoryLookup[weekDate][brandId][packageTypeId];
+        });
+
+        BrewOptix.reqres.setHandler("weeklyPackageMaterialInventory:entity", function (weekDate, packageMaterialId, brandId) {
+            weekDate = BrewOptix.getStringFromDate(weekDate);
+            if (weeklyPackageMaterialInventoryLookup[weekDate] === undefined) {
+                return undefined;
+            }
+            if (weeklyPackageMaterialInventoryLookup[weekDate][packageMaterialId] === undefined) {
+                return undefined;
+            }
+            if (brandId !== '') {
+                return weeklyPackageMaterialInventoryLookup[weekDate][packageMaterialId][brandId];
+            }
+            return weeklyPackageMaterialInventoryLookup[weekDate][packageMaterialId];
+        });
+
+        var quarters = BrewOptix.request("weeklysales:quarters");
+
+        var brandFilter = "all";
+        var startDateFilter = "05052014";
+        var endDateFilter = "08012014";
+
+        var timeIncludeFilter = {
+            startDate: null,
+            endDate: null,
+            rootDate: new Date("12/30/2013"),
+            earliestDate: new Date("12/30/2013"),
+            quarterIncluded: function () {
+                return true;
+            },
+
+            monthIncluded: function () {
+                return true;
+            },
+
+            dateIncluded: function(date) {
+                return (this.startDate === null || this.startDate <= date) && (this.endDate === null || this.endDate >= date);
+            }
+        };
+
+        applyFilter(brandFilter, startDateFilter, endDateFilter);
+
+        function applyFilter(brandCriterion, startDateCriterion, endDateCriterion) {
+            brandFilter = brandCriterion;
+            startDateFilter = startDateCriterion;
+            endDateFilter = endDateCriterion;
+            var startDate;
+            var endDate = null;
+
+            if (endDateFilter !== "all") {
+                endDate = getDateFromFilterString(endDateFilter);
+            }
+            timeIncludeFilter.endDate = endDate;
+
+            if (startDateFilter !== "all") {
+                startDate = getDateFromFilterString(startDateFilter);
+                timeIncludeFilter.startDate = startDate;
+                var first = true;
+                $.each(quarters, function (index, quarter) {
+                    if (first && timeIncludeFilter.quarterIncluded(quarter)) {
+                        timeIncludeFilter.rootDate = quarter.startDate;
+                        first = false;
+                    }
+                });
+            } else {
+                timeIncludeFilter.rootDate = new Date("12/30/2013");
+                timeIncludeFilter.startDate = null;
+            }
+
+        }
+
+        BrewOptix.on("inventory:applyFilter", applyFilter);
+
+        BrewOptix.reqres.setHandler("inventory:brandFilter", function() { return brandFilter; });
+
+        BrewOptix.reqres.setHandler("inventory:startDateFilter", function() { return startDateFilter; });
+
+        BrewOptix.reqres.setHandler("inventory:endDateFilter", function () { return endDateFilter; });
+
+        BrewOptix.reqres.setHandler("inventory:timeIncludeFilter", function () { return timeIncludeFilter; });
+
+        BrewOptix.reqres.setHandler("inventory:entities:summary", function () {
+            var data;
+
+            var defer = $.Deferred();
+
+            data = {};
+
+            var fetchingBrands = BrewOptix.request("brand:entities");
+
+            var fetchingPackageTypes = BrewOptix.request("packageType:entities");
+
+            var fetchingWeeklyBeerInventory = api.getWeeklyBeerInventory();
+
+            $.when(fetchingBrands, fetchingPackageTypes, fetchingWeeklyBeerInventory).done(
+                function (brands, packageTypes, weeklyBeerInventory) {
+                    data.quarters = quarters;
+                    data.brands = brands;
+                    data.packageTypes = packageTypes;
+                    data.weeklyBeerInventory = weeklyBeerInventory;
+                    defer.resolve(new Backbone.Model(data));
+                }
+            );
+
+            return defer.promise();
+        });
+
+        BrewOptix.reqres.setHandler("inventory:entities:packageMaterials", function () {
+            var data;
+
+            var defer = $.Deferred();
+
+            data = {};
+
+            var fetchingBrands = BrewOptix.request("brand:entities");
+
+            var fetchingPackageMaterials= BrewOptix.request("packageMaterial:entities");
+
+            var fetchingWeeklyPackageMaterialInventory = api.getWeeklyPackageMaterialInventory();
+
+            $.when(fetchingBrands, fetchingPackageMaterials, fetchingWeeklyPackageMaterialInventory).done(
+                function (brands, packageMaterials, weeklyPackageMaterialInventory) {
+                    data.quarters = quarters;
+                    data.brands = brands;
+                    data.packageMaterials = packageMaterials;
+                    data.weeklyPackageMaterialInventory = weeklyPackageMaterialInventory;
+                    defer.resolve(new Backbone.Model(data));
+                }
+            );
+
+            return defer.promise();
+        });
+
+        function getDateFromFilterString(input) {
+            var inputDate = new Date(BrewOptix.getDateString(input));
+
+            if (inputDate < timeIncludeFilter.earliestDate) {
+                inputDate = timeIncludeFilter.earliestDate;
+            }
+
+            return inputDate;
+        }
+    });
+
+    return BrewOptix.Entities.Inventory;
+
+});

@@ -1,0 +1,125 @@
+define(["app"], function(BrewOptix) {
+    
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.PackageType = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("PackageType"),
+            defaults: { "Name": "", "SizeInOunces": 0, "ProductType": 1, "LossRate": 0,"UseForOrdering": false},
+            idAttribute: "EntityID"
+        });
+
+        Entities.PackageTypeCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("PackageType"),
+            model: Entities.PackageType,
+            comparator: function (model1, model2) {
+                if (model1.get("ProductType") < model2.get("ProductType")) return -1;
+                if (model1.get("ProductType") > model2.get("ProductType")) return 1;
+                if (model1.get("Name") < model2.get("Name")) return -1;
+                if (model1.get("Name") > model2.get("Name")) return 1;
+                return 0;
+            }
+        });
+
+
+        var packageTypes;
+
+        var packageTypeByName = {};
+        var packageTypeById = {};
+
+        var api = {
+            getPackageTypes: function () {
+                var defer = $.Deferred();
+
+                if (packageTypes !== undefined && packageTypes.length > 0) {
+                    defer.resolve(packageTypes);
+                } else {
+                    packageTypes = new Entities.PackageTypeCollection();
+
+                    packageTypes.fetch({
+                        success: function(data) {
+                            _.each(packageTypes.models, function (packageType) {
+                                packageTypeByName[packageType.get('Name')] = packageType;
+                                packageTypeById[packageType.get('EntityID')] = packageType;
+                            });
+
+                            defer.resolve(data);
+                        }
+                    });
+                }
+
+                return defer.promise();
+            }
+        };
+
+        BrewOptix.reqres.setHandler("packageType:entities", function () { return api.getPackageTypes(); });
+
+        BrewOptix.reqres.setHandler("packageType:entity", function (id) {
+            var packageType = packageTypes.where({ EntityID: id });
+            if (packageType.length > 0) {
+                return packageType[0];
+            } else {
+                return undefined;
+            }
+        });
+
+        BrewOptix.reqres.setHandler("packageType:getName", function (id) {
+            if (packageTypeById[id] !== undefined) {
+                return packageTypeById[id].get('Name');
+            }
+
+            return "";
+        });
+
+        BrewOptix.reqres.setHandler("packageType:getId", function (name) {
+            return packageTypeByName[name].get('EntityID');
+        });
+
+        BrewOptix.on("packageType:added", function (packageType) {
+            packageTypes.set(packageType, { remove: false });
+            packageTypes.trigger('reset');
+        });
+
+        BrewOptix.reqres.setHandler("packageType:dataFromPackageMaterialUsage", function (packageType) {
+            var data = [];
+
+            if (packageType !== undefined && packageType !== null) {
+                var packageMaterialUsage = packageType.get('PackageMaterialUsage');
+                if (packageMaterialUsage !== undefined && packageMaterialUsage !== null) {
+                    for(var packageMaterialId in packageMaterialUsage) {
+                        var packageMaterialName = BrewOptix.request("packageMaterial:getName",packageMaterialId);
+
+                        data.push([packageMaterialName, packageMaterialUsage[packageMaterialId]]);
+                    };
+                }
+            }
+
+            return data;
+        });
+
+        BrewOptix.reqres.setHandler("packageType:packageMaterialUsageFromData", function (packageMaterialUsageData) {
+            var packageMaterialUsage = {};
+
+            for (var i = 0; i < packageMaterialUsageData.length; i++) {
+                var row = packageMaterialUsageData[i];
+                if (row[0] !== undefined && row[0] !== null) {
+                    var packageMaterialId = BrewOptix.request("packageMaterial:getId", row[0]);
+                    var quantity = row[1];
+
+                    if (quantity === undefined || quantity === null || quantity === '') {
+                        quantity = 0;
+                    }
+
+                    if (quantity !== 0) {
+                        packageMaterialUsage[packageMaterialId] = quantity;
+                    }
+                }
+            }
+
+            return packageMaterialUsage;
+        });
+
+    });
+
+    return BrewOptix.Entities.PackageType;
+});
+

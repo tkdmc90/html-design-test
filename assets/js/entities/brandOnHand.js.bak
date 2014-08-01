@@ -1,0 +1,60 @@
+define(["app"], function(BrewOptix) {
+    
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.BrandOnHand = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("BrandOnHand"),
+            defaults: { "DisplayValue": "" },
+            idAttribute: "EntityID"
+        });
+
+        Entities.BrandOnHandCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("BrandOnHand"),
+            model: Entities.BrandOnHand,
+            comparator: "name"
+        });
+
+
+        var brandOnHands;
+
+        var api = {
+            getBrandOnHands: function () {
+                var defer = $.Deferred();
+
+                if (brandOnHands !== undefined && brandOnHands.length > 0) {
+                    defer.resolve(brandOnHands);
+                } else {
+                    brandOnHands = new Entities.BrandOnHandCollection();
+
+                    brandOnHands.fetch({
+                        success: function(data) {
+                            defer.resolve(data);
+                        }
+                    });
+                }
+
+                return defer.promise();
+            }
+        };
+
+        BrewOptix.reqres.setHandler("brandOnHand:entities", function () { return api.getBrandOnHands(); });
+
+        BrewOptix.reqres.setHandler("brandOnHand:entity", function (id) {
+            var brandOnHand = brandOnHands.where({ EntityID: id });
+            if (brandOnHand.length > 0) {
+                return brandOnHand[0];
+            } else {
+                return undefined;
+            }
+        });
+
+        BrewOptix.on("brandOnHand:added", function (brandOnHand) {
+            brandOnHands.set(brandOnHand, { remove: false });
+            brandOnHands.trigger('reset');
+        });
+
+    });
+
+    return BrewOptix.Entities.BrandOnHand;
+});
+

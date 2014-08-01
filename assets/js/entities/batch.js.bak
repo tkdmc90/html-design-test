@@ -1,0 +1,121 @@
+define(["app"], function(BrewOptix) {
+    
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.Batch = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("Batch"),
+            defaults: { "BatchID": "", "BrandID": "", "BrewDate": new Date(), "ReadyDate": new Date(), "ShelfLifeToShip": new Date(),"Status" : 0,"SizeInBarrels":0,"Notes":"" },
+            idAttribute: "EntityID"
+        });
+
+        Entities.BatchCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("Batch"),
+            model: Entities.Batch,
+            comparator: "BatchID"
+        });
+
+
+        var batches;
+
+        var api = {
+            getBatches: function () {
+                var defer = $.Deferred();
+
+                if (batches !== undefined && batches.length > 0) {
+                    defer.resolve(batches);
+                } else {
+                    batches = new Entities.BatchCollection();
+
+                    batches.fetch({
+                        success: function(data) {
+                            defer.resolve(data);
+                        }
+                    });
+                }
+
+                return defer.promise();
+            }
+        };
+
+        var brandFilter = "all";
+        var startDateFilter = "all";
+        var endDateFilter = "all";
+
+        BrewOptix.on("batch:filter", function (brandCriterion, startDateCriterion, endDateCriterion) {
+            brandFilter = brandCriterion;
+            startDateFilter = startDateCriterion;
+            endDateFilter = endDateCriterion;
+        });
+
+
+        BrewOptix.reqres.setHandler("batch:brandFilter", function () { return brandFilter; });
+
+        BrewOptix.reqres.setHandler("batch:startDateFilter", function () { return startDateFilter; });
+
+        BrewOptix.reqres.setHandler("batch:endDateFilter", function () { return endDateFilter; });
+
+        BrewOptix.reqres.setHandler("batch:entities", function () { return api.getBatches(); });
+
+        BrewOptix.reqres.setHandler("batch:entity", function (id) {
+            var batch = batches.where({ EntityID: id });
+            if (batch.length > 0) {
+                return batch[0];
+            } else {
+                return undefined;
+            }
+        });
+
+        BrewOptix.on("batch:added", function (batch) {
+            batches.set(batch, { remove: false });
+            batches.trigger('reset');
+        });
+
+        BrewOptix.reqres.setHandler("batch:packageDataFromBatch", function (batch) {
+            var data = [];
+
+            if (batch !== undefined && batch !== null) {
+                var packaging = batch.get('Packaging');
+                if (packaging !== undefined && packaging !== null && packaging.length > 0) {
+                    _.each(packaging, function (batchPackage) {
+                        var packageTypeName = BrewOptix.request("packageType:getName", batchPackage.PackageTypeID);
+
+                        data.push([packageTypeName, batchPackage.AvailableQuantity, batchPackage.ReserveQuantity]);
+                    });
+                }
+            }
+
+            return data;
+        });
+
+        BrewOptix.reqres.setHandler("batch:packagingFromData", function (packageData) {
+            var packaging = [];
+
+            for (var i = 0; i < packageData.length; i++) {
+                var row = packageData[i];
+                if (row[0] !== undefined && row[0] !== null) {
+                    var packageTypeId = BrewOptix.request("packageType:getId", row[0]);
+                    var availableQuantity = row[1];
+                    var reserveQuantity = row[2];
+
+                    if (availableQuantity === undefined || availableQuantity === null || availableQuantity === '') {
+                        availableQuantity = 0;
+                    }
+
+                    if (reserveQuantity === undefined || reserveQuantity === null || reserveQuantity === '') {
+                        reserveQuantity = 0;
+                    }
+
+                    if (availableQuantity !== 0 || reserveQuantity !== 0) {
+                        packaging.push({ PackageTypeID: packageTypeId, AvailableQuantity: availableQuantity, ReserveQuantity: reserveQuantity });
+                    }
+                }
+            }
+
+            return packaging;
+        });
+
+    });
+
+    return BrewOptix.Entities.Batch;
+});
+

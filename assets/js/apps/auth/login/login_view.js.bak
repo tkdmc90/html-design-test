@@ -1,0 +1,27 @@
+﻿define(["app","tpl!apps/auth/login/templates/login.html"],
+    function (BrewOptix, loginTpl) {
+        BrewOptix.module("AuthApp.Login.View", function (View, BrewOptix, Backbone, Marionette, $, _) {
+
+            View.Form = Marionette.ItemView.extend({
+                template: loginTpl,
+                templateHelpers: BrewOptix,
+                events: {
+                    "click #loginButton": "login"
+                },
+                ui: {
+                    inputEmail: "input#username",
+                    inputPassword: "input#password",
+                    loginButton: "button#loginButton"
+                },
+
+                login: function (e) {
+                    e.preventDefault();
+                    var data = { username: $(this.ui.inputEmail).val(), password: $(this.ui.inputPassword).val() };
+                    this.trigger("form:submit", data);
+                }
+            });
+        });
+
+        return BrewOptix.AuthApp.Login.View;
+    }
+);

@@ -1,0 +1,29 @@
+﻿define(["app"], function (BrewOptix) {
+    BrewOptix.module("UserApp", function (UserApp, BrewOptix, Backbone, Marionette, $, _) {
+
+        var api = {
+            getProfile: function () {
+                require(["apps/user/profile/profile_controller"], function (ProfileController) {
+                    ProfileController.getProfile();
+                });
+            }
+        };
+
+        BrewOptix.on("user:getProfile", function () {
+            api.getProfile();
+        });
+        
+        BrewOptix.on("user:editProfile", function () {
+            require(["apps/userAccount/userAccount_app"], function () {
+                var fetchingUserAccounts = BrewOptix.request("userAccount:entities");
+
+                $.when(fetchingUserAccounts).done(function () {
+                    var userAccount = BrewOptix.request("userAccount:entity", BrewOptix.UserAccountID);
+                    BrewOptix.trigger("userAccount:edit", userAccount);
+                });
+            });
+        });
+    });
+
+    return BrewOptix.AuthApp;
+});

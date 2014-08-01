@@ -1,0 +1,69 @@
+﻿define(["app"], function(BrewOptix) {
+    
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.Distributor = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("Distributor"),
+            defaults: { "Name": "", "Street1": "", "Street2": "", "City": "", "State": "", "Zip": "" },
+            idAttribute: "EntityID"
+        });
+
+        Entities.DistributorCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("Distributor"),
+            model: Entities.Distributor,
+            comparator: "Name"
+        });
+
+
+        var distributors;
+
+        var api = {
+            getDistributors: function () {
+                var defer = $.Deferred();
+
+                if (distributors !== undefined && distributors.length > 0) {
+                    defer.resolve(distributors);
+                } else {
+                    distributors = new Entities.DistributorCollection();
+
+                    distributors.fetch({
+                        success: function(data) {
+                            defer.resolve(data);
+                        }
+                    });
+                }
+
+                return defer.promise();
+            }
+        };
+
+        BrewOptix.reqres.setHandler("distributor:entities", function () { return api.getDistributors(); });
+
+        BrewOptix.reqres.setHandler("distributor:entity", function (id) {
+            if (distributors !== undefined) {
+                var distributor = distributors.where({ EntityID: id });
+                if (distributor.length > 0) {
+                    return distributor[0];
+                } else {
+                    return undefined;
+                }
+            } else {
+                return undefined;
+            }
+        });
+
+        BrewOptix.reqres.setHandler("distributor:entities:name", function (id) {
+            var name = '';
+            distributors.each(function (distributor) {
+                if (distributor.get('EntityID') == id) {
+                    name = distributor.get('Name');
+                }
+            });
+
+            return name;
+        });
+    });
+
+    return BrewOptix.Entities.Distributor;
+});
+

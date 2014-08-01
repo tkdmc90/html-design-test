@@ -1,0 +1,33 @@
+﻿define(["app"], function (BrewOptix) {
+
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.UserProfile = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("Profile")
+        });
+
+        var profile;
+
+        var api = {
+            getProfile: function () {
+
+                var defer = $.Deferred();
+
+                profile = new Entities.UserProfile();
+
+                profile.fetch({
+                    success: function (data) {
+                        defer.resolve(data);
+                    }
+                });
+
+                return defer.promise();
+            }
+        };
+
+        BrewOptix.reqres.setHandler("userProfile:entity", function () { return api.getProfile(); });
+    });
+
+    return BrewOptix.Entities.UserProfile;
+});
+

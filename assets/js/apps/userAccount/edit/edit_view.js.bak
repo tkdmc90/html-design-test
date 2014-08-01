@@ -1,0 +1,15 @@
+define(["app", "apps/userAccount/common/form_view"],
+    function (BrewOptix) {
+        BrewOptix.module("UserAccountApp.Edit.View", function (View, BrewOptix, Backbone, Marionette, $, _) {
+
+            View.UserAccount = BrewOptix.UserAccountApp.Common.Views.Form.extend({
+                initialize: function() {
+                    this.title = "Edit " + this.model.get('DisplayName');
+                    this.mode = "edit";
+                }
+            });
+        });
+
+        return BrewOptix.UserAccountApp.Edit.View;
+    }
+);

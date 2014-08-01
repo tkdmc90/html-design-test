@@ -1,0 +1,92 @@
+define(["app"], function(BrewOptix) {
+    
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.PackageMaterial = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("PackageMaterial"),
+            defaults: { "Name": "", "BrandSpecific": false, "LossRate":0 },
+            idAttribute: "EntityID"
+        });
+
+        Entities.PackageMaterialCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("PackageMaterial"),
+            model: Entities.PackageMaterial,
+            comparator: "Name"
+        });
+
+
+        var packageMaterials;
+
+        var packageMaterialByName = {};
+        var packageMaterialById = {};
+
+        var api = {
+            getPackageMaterials: function () {
+                var defer = $.Deferred();
+
+                if (packageMaterials !== undefined && packageMaterials.length > 0) {
+                    defer.resolve(packageMaterials);
+                } else {
+                    packageMaterials = new Entities.PackageMaterialCollection();
+
+                    packageMaterials.fetch({
+                        success: function(data) {
+                            _.each(packageMaterials.models, function (packageMaterial) {
+                                packageMaterialByName[packageMaterial.get('Name')] = packageMaterial;
+                                packageMaterialById[packageMaterial.get('EntityID')] = packageMaterial;
+                            });
+
+                            defer.resolve(data);
+                        }
+                    });
+                }
+
+                return defer.promise();
+            }
+        };
+
+        BrewOptix.reqres.setHandler("packageMaterial:entities", function () { return api.getPackageMaterials(); });
+
+        BrewOptix.reqres.setHandler("packageMaterial:entity", function (id) {
+            var packageMaterial = packageMaterials.where({ EntityID: id });
+            if (packageMaterial.length > 0) {
+                return packageMaterial[0];
+            } else {
+                return undefined;
+            }
+        });
+
+        BrewOptix.reqres.setHandler("packageMaterial:getName", function (id) {
+            var packageMaterial = packageMaterialById[id];
+
+            if (packageMaterial === undefined) {
+                packageMaterial = packageMaterials.where({ EntityID: id })[0];
+                packageMaterialByName[packageMaterial.get('Name')] = packageMaterial;
+                packageMaterialById[packageMaterial.get('EntityID')] = packageMaterial;
+            }
+
+            return packageMaterial.get('Name');
+        });
+
+        BrewOptix.reqres.setHandler("packageMaterial:getId", function (name) {
+            var packageMaterial = packageMaterialByName[name];
+
+            if (packageMaterial === undefined) {
+                packageMaterial = packageMaterials.where({ Name: name })[0];
+                packageMaterialByName[packageMaterial.get('Name')] = packageMaterial;
+                packageMaterialById[packageMaterial.get('EntityID')] = packageMaterial;
+            }
+
+            return packageMaterial.get('EntityID');
+        });
+
+        BrewOptix.on("packageMaterial:added", function (packageMaterial) {
+            packageMaterials.set(packageMaterial, { remove: false });
+            packageMaterials.trigger('reset');
+        });
+
+    });
+
+    return BrewOptix.Entities.PackageMaterial;
+});
+

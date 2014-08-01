@@ -1,0 +1,14 @@
+define(["app", "apps/userAccount/common/form_view"],
+    function (BrewOptix) {
+        BrewOptix.module("UserAccountApp.New.View", function (View, BrewOptix, Backbone, Marionette, $, _) {
+
+            View.UserAccount = BrewOptix.UserAccountApp.Common.Views.Form.extend({
+                initialize: function () {
+                    this.title = "New User Account";
+                }
+            });
+        });
+
+        return BrewOptix.UserAccountApp.New.View;
+    }
+);

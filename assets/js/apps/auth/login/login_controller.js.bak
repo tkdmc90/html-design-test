@@ -1,0 +1,50 @@
+﻿define(["app", "apps/auth/login/login_view", "jquery-ui"], function (BrewOptix, View) {
+    BrewOptix.module("AuthApp.Login", function (Login, BrewOptix, Backbone, Marionette, $, _) {
+
+        Login.Controller = {
+            showLogin: function (route) {
+
+                var view = new View.Form();
+
+                view.on("show", function() {
+                    this.$el.dialog({
+                        modal: true,
+                        width: "auto",
+                        title: "Login",
+                        dialogClass: "no-close",
+                        closeOnEscape: false
+                    });
+                });
+
+                view.on('form:submit', function (data) {
+                    $.ajax({
+                        url: BrewOptix.url('login'),
+                        method: 'POST',
+                        data: data,
+                        success: function (result) {
+                            if (result !== null) {
+                                BrewOptix.AuthApp.LoginHash = result.AuthToken;
+                                $.cookie('auth', BrewOptix.AuthApp.LoginHash, { expires: 30 });
+                                view.close();
+                                window.location.replace('#');
+                                BrewOptix.trigger("user:getProfile");
+                                if (route !== '') {
+                                    BrewOptix.navigate(route, {trigger: true});
+                                }
+                            } else {
+                                alert('Invalid username/password');
+                            }
+                        }
+                    });
+                });
+
+                BrewOptix.mainRegion.reset();
+
+                BrewOptix.dialogRegion.show(view);
+
+            }
+        };
+    });
+
+    return BrewOptix.AuthApp.Login.Controller;
+});

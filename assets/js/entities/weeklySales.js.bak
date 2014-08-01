@@ -1,0 +1,311 @@
+﻿define(["app"], function(BrewOptix) {
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.WeeklySales = Backbone.Model.extend({
+                idAttribute: "BrandID"
+        });
+
+        Entities.WeeklySalesCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("WeeklySales"),
+            model: Entities.WeeklySales
+        });
+
+        var weeklySales;
+
+        var api = {
+            getWeeklySales: function () {
+                var defer = $.Deferred();
+
+                if (weeklySales !== undefined && weeklySales.length > 0) {
+                    defer.resolve(weeklySales);
+                } else {
+                    weeklySales = new Entities.WeeklySalesCollection();
+
+                    weeklySales.fetch({
+                        success: function (data) {
+                            defer.resolve(data);
+                        }
+                    });
+                }
+
+                return defer.promise();
+            }
+        };
+
+        var brandFilter = "all";
+        var distributorFilter = "all";
+        var startDateFilter = "all";
+        var endDateFilter = "all";
+
+        var timeIncludeFilter = {
+            startDate: null,
+            endDate: null,
+            rootDate: new Date("12/30/2013"),
+            earliestDate: new Date("12/30/2013"),
+            quarterIncluded: function (quarter) {
+                return ((this.startDate === null || this.startDate <= quarter.endDate) && (this.endDate === null || this.endDate >= quarter.startDate));
+            },
+
+            monthIncluded: function (year, month) {
+                var monthStart = new Date(year, month, 1);
+                var monthEnd = new Date(monthStart.getTime());
+
+                monthEnd.setMonth(monthStart.getMonth() + 1);
+
+                return ((this.startDate === null || this.startDate < monthEnd) && (this.endDate === null || this.endDate >= monthStart));
+            }
+        };
+
+
+        BrewOptix.on("weeklysales:filterSummary", function (brandCriterion, distributorCriterion, startDateCriterion, endDateCriterion) {
+            brandFilter = brandCriterion;
+            distributorFilter = distributorCriterion;
+            startDateFilter = startDateCriterion;
+            endDateFilter = endDateCriterion;
+            var startDate;
+            var endDate = null;
+
+            if (endDateFilter !== "all") {
+                endDate = getDateFromFilterString(endDateFilter);
+            }
+            timeIncludeFilter.endDate = endDate;
+
+            if (startDateFilter !== "all") {
+                startDate = getDateFromFilterString(startDateFilter);
+                timeIncludeFilter.startDate = startDate;
+                var first = true;
+                $.each(getQuarters(), function(index, quarter) {
+                    if (first && timeIncludeFilter.quarterIncluded(quarter)) {
+                        timeIncludeFilter.rootDate = quarter.startDate;
+                        first = false;
+                    }
+                });
+            } else {
+                timeIncludeFilter.rootDate = new Date("12/30/2013");
+                timeIncludeFilter.startDate = null;
+            }
+
+        });
+
+        BrewOptix.reqres.setHandler("weeklysales:brandFilter", function () { return brandFilter; });
+
+        BrewOptix.reqres.setHandler("weeklysales:distributorFilter", function () { return distributorFilter; });
+
+        BrewOptix.reqres.setHandler("weeklysales:startDateFilter", function () { return startDateFilter; });
+
+        BrewOptix.reqres.setHandler("weeklysales:endDateFilter", function () { return endDateFilter; });
+
+        BrewOptix.reqres.setHandler("weeklysales:timeIncludeFilter", function () { return timeIncludeFilter; });
+
+        BrewOptix.reqres.setHandler("weeklysales:entities", function () { return api.getWeeklySales(); });
+
+        BrewOptix.reqres.setHandler("weeklysales:entities:summary", function () {
+
+            var fetchingPackageTypes = BrewOptix.request("packageType:entities");
+            var packageTypes = {};
+
+            $.when(fetchingPackageTypes).done(function (packageTypeData) {
+                packageTypeData.each(function(packageType) {
+                    packageTypes[packageType.get('Name')] = packageType.get('EntityID');
+                });
+            });
+
+            var mainstays = getBrands("mainstay");
+            var seasonals = getBrands("seasonal");
+
+            var casePackages = [];
+
+            if (mainstays.length > 0) {
+                casePackages.push({
+                    name: "12oz Mainstay",
+                    packageType: packageTypes["12oz Bottle"],
+                    brands: mainstays
+                });
+            }
+
+            if (seasonals.length > 0) {
+                casePackages.push({
+                    name: "12oz Seasonal",
+                    packageType: packageTypes["12oz Bottle"],
+                    brands: seasonals
+                });
+
+                casePackages.push({
+                    name: "22oz Seasonal",
+                    packageType: packageTypes["22oz Bottle"],
+                    brands: seasonals
+                });
+            }
+
+
+            var caseProduct = {name: "Case",packageBrandType: casePackages};
+
+            var draftPackages = [];
+
+            if (mainstays.length > 0) {
+                draftPackages.push({
+                    name: "15.5gal Mainstay",
+                    packageType: packageTypes["15.5gal Keg"],
+                    brands: mainstays
+                });
+            }
+
+            if (seasonals.length > 0) {
+                draftPackages.push({
+                    name: "15.5gal Seasonal",
+                    packageType: packageTypes["15.5gal Keg"],
+                    brands: seasonals
+                });
+            }
+
+            if (mainstays.length > 0) {
+                draftPackages.push({
+                    name: "5.17gal Mainstay",
+                    packageType: packageTypes["5.17gal Keg"],
+                    brands: mainstays
+                });
+            }
+
+            if (seasonals.length > 0) {
+                draftPackages.push({
+                    name: "5.17gal Seasonal",
+                    packageType: packageTypes["5.17gal Keg"],
+                    brands: seasonals
+                });
+            }
+
+            var draftProduct = { name: "Draft", packageBrandType: draftPackages };
+
+            var products = [caseProduct, draftProduct];
+
+            var data = { quarters: getQuarters(), products: products };
+
+            return new Backbone.Model(data);
+        });
+
+        BrewOptix.reqres.setHandler("weeklysales:entities:brand:packagetype:week:total", function (brandId, packageType, weekKey) {
+            var brandSales = weeklySales.where({ BrandID: brandId });
+            var total = 0;
+
+            if (brandSales.length == 0) {
+                return total;
+            }
+
+            var sales = brandSales[0].get('Sales');
+            for (var distributorSales in sales) {
+                if (distributorFilter === "all" || distributorFilter === distributorSales) {
+                    var packageSales = sales[distributorSales][packageType];
+
+                    if (packageSales !== undefined) {
+                        var weekSales = packageSales[weekKey];
+                        if (weekSales !== undefined) {
+                            total = total + weekSales;
+                        }
+                    }
+                }
+            };
+
+            return total;
+        });
+
+        BrewOptix.reqres.setHandler("weeklysales:entities:brand:packagetype:week:detail", function (brandId, packageType, weekKey) {
+            var brandSales = weeklySales.where({ BrandID: brandId });
+            var details = new Backbone.Collection();
+
+            if (brandSales.length == 0) {
+                return 0;
+            }
+
+            var sales = brandSales[0].get('Sales');
+            for (var distributorSales in sales) {
+                var packageSales = sales[distributorSales][packageType];
+
+                if (packageSales !== undefined) {
+                    var weekSales = packageSales[weekKey];
+                    if (weekSales !== undefined) {
+                        var name = BrewOptix.request("distributor:entities:name", distributorSales);
+                        var detail = new Backbone.Model({ name: name, distributorId: distributorSales, quantity: weekSales });
+                        details.add(detail);
+                    }
+                }
+            };
+
+            details.comparator = "name";
+            return details;
+        });
+
+        BrewOptix.reqres.setHandler("weeklysales:quarters", function() { return getQuarters(); });
+
+        function getDateFromFilterString(input) {
+            var inputDate = new Date(BrewOptix.getDateString(input));
+
+            if (inputDate < timeIncludeFilter.earliestDate) {
+                inputDate = timeIncludeFilter.earliestDate;
+            }
+
+            return inputDate;
+        }
+        
+        function getBrands(brandType) {
+            var brands = new Array();
+            var brandModels = BrewOptix.request("brand:entities:bytype", brandType);
+            var index = 0;
+            brandModels.each(function (brandModel) {
+                if (brandMatchesFilter(brandModel)) {
+                    var brand = { name: brandModel.get('Name'), id: brandModel.get('EntityID') };
+                    brands[index] = brand;
+                    index++;
+                }
+            });
+
+            return brands;
+        }
+
+        function brandMatchesFilter(brandModel) {
+            var id = brandModel.get('EntityID');
+            return (brandFilter === "all" || brandFilter === id);
+        }
+
+        function getQuarters() {
+            var quarters = [
+            {
+                startDate: new Date("12/30/2013"),
+                endDate: new Date("4/6/2014"),
+                year: 2014,
+                number: 1,
+                weeks: 14,
+                months: [{ name: "January", number: 1, weeks: 5 }, { name: "February", number: 2, weeks: 4 }, { name: "March", number: 3, weeks: 5 }]
+            },
+            {
+                startDate: new Date("4/7/2014"),
+                endDate: new Date("7/6/2014"),
+                year: 2014,
+                number: 2,
+                weeks: 13,
+                months: [{ name: "April", number: 4, weeks: 4 }, { name: "May", number: 5, weeks: 4 }, { name: "June", number: 6, weeks: 5 }]
+            },
+            {
+                startDate: new Date("7/7/2014"),
+                endDate: new Date("10/5/2014"),
+                year: 2014,
+                number: 3,
+                weeks: 13,
+                months: [{ name: "July", number: 7, weeks: 4 }, { name: "August", number: 8, weeks: 4 }, { name: "September", number: 9, weeks: 5 }]
+            },
+            {
+                startDate: new Date("10/6/2014"),
+                endDate: new Date("12/29/2014"),
+                year: 2014,
+                number: 4,
+                weeks: 13,
+                months: [{ name: "October", number: 10, weeks: 4 }, { name: "November", number: 11, weeks: 4 }, { name: "December", number: 12, weeks: 5 }]
+            }
+
+            ];
+
+            return quarters;
+        }
+    });
+
+    return BrewOptix.Entities.WeeklySales;
+});

@@ -1,0 +1,134 @@
+﻿define(["app"], function (BrewOptix) {
+
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.Brand = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("Brand"),
+            defaults: { "Name": "", "Seasonal": false, "ImageName": "" },
+            idAttribute: "EntityID"
+        });
+
+        Entities.BrandCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("Brand"),
+            model: Entities.Brand,
+            comparator: "Name"
+        });
+
+        Entities.BrandType = Backbone.Model.extend({
+        });
+
+        Entities.BrandTypeCollection = Backbone.Collection.extend({
+            model: Entities.BrandType
+        });
+
+        var brands;
+
+        var brandTypes;
+
+        var brandByName = {};
+        var brandById = {};
+
+        var api = {
+            getBrands: function () {
+                var defer = $.Deferred();
+
+                if (brands !== undefined && brands.length > 0) {
+                    defer.resolve(brands);
+                } else {
+                    brands = new Entities.BrandCollection();
+
+                    brands.fetch({
+                        success: function(data) {
+                            _.each(brands.models, function (brand) {
+                                brandByName[brand.get('Name')] = brand;
+                                brandById[brand.get('EntityID')] = brand;
+                            });
+
+                            defer.resolve(data);
+                        }
+                    });
+                }
+
+                return defer.promise();
+            },
+
+            getBrandTypes: function () {
+                if (brandTypes !== undefined) {
+                    return brandTypes;
+                }
+
+                brandTypes = new Entities.BrandTypeCollection();
+                brandTypes.add(new Entities.BrandType({ Name: "Mainstay" }));
+                brandTypes.add(new Entities.BrandType({ Name: "Seasonal" }));
+
+                return brandTypes;
+            }
+        };
+
+        BrewOptix.reqres.setHandler("brand:entities", function () { return api.getBrands(); });
+
+        BrewOptix.reqres.setHandler("brand:entity", function (id) {
+            if (brands !== undefined) {
+                var brand = brands.where({ EntityID: id });
+                if (brand.length > 0) {
+                    return brand[0];
+                } else {
+                    return undefined;
+                }
+            } else {
+                return undefined;
+            }
+        });
+
+        BrewOptix.reqres.setHandler("brand:entities:bytype", function (brandType) {
+            var unfilteredBrands = brands;
+            var filteredBrands;
+
+            if (brandType == "seasonal") {
+                filteredBrands = unfilteredBrands.where({ Seasonal: true });
+            } else {
+                filteredBrands = unfilteredBrands.where({ Seasonal: false });
+            }
+
+            return new Entities.BrandCollection(filteredBrands);
+        });
+
+        BrewOptix.reqres.setHandler("brandType:entities", function () { return api.getBrandTypes(); });
+
+        BrewOptix.reqres.setHandler("brand:entities:name", function (id) {
+            var name = '';
+            brands.each(function (brand) {
+                if (brand.get('EntityID') == id) {
+                    name = brand.get('Name');
+                }
+            });
+
+            return name;
+        });
+
+        BrewOptix.reqres.setHandler("brand:getName", function (id) {
+            return brandById[id].get('Name');
+        });
+
+        BrewOptix.reqres.setHandler("brand:getId", function (name) {
+            return brandByName[name].get('EntityID');
+        });
+
+        BrewOptix.on("brand:added", function (brand) {
+            brands.set(brand, { remove: false });
+            brands.trigger('reset');
+        });
+
+        BrewOptix.on("brand:edited", function (brand) {
+            brands.set(brand, { remove: false });
+            brands.trigger('reset');
+        });
+
+        BrewOptix.on("brand:deleted", function (data) {
+            brands.remove(data.ID);
+            brands.trigger('reset');
+        });
+    });
+
+    return BrewOptix.Entities.Brand;
+});

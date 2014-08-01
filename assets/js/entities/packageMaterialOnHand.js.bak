@@ -1,0 +1,60 @@
+define(["app"], function(BrewOptix) {
+    
+    BrewOptix.module("Entities", function (Entities, BrewOptix, Backbone, Marionette, $, _) {
+
+        Entities.PackageMaterialOnHand = Backbone.Model.extend({
+            urlRoot: BrewOptix.url("PackageMaterialOnHand"),
+            defaults: { "DisplayValue": "" },
+            idAttribute: "EntityID"
+        });
+
+        Entities.PackageMaterialOnHandCollection = Backbone.Collection.extend({
+            url: BrewOptix.url("PackageMaterialOnHand"),
+            model: Entities.PackageMaterialOnHand,
+            comparator: "name"
+        });
+
+
+        var packageMaterialOnHands;
+
+        var api = {
+            getPackageMaterialOnHands: function () {
+                var defer = $.Deferred();
+
+                if (packageMaterialOnHands !== undefined && packageMaterialOnHands.length > 0) {
+                    defer.resolve(packageMaterialOnHands);
+                } else {
+                    packageMaterialOnHands = new Entities.PackageMaterialOnHandCollection();
+
+                    packageMaterialOnHands.fetch({
+                        success: function(data) {
+                            defer.resolve(data);
+                        }
+                    });
+                }
+
+                return defer.promise();
+            }
+        };
+
+        BrewOptix.reqres.setHandler("packageMaterialOnHand:entities", function () { return api.getPackageMaterialOnHands(); });
+
+        BrewOptix.reqres.setHandler("packageMaterialOnHand:entity", function (id) {
+            var packageMaterialOnHand = packageMaterialOnHands.where({ EntityID: id });
+            if (packageMaterialOnHand.length > 0) {
+                return packageMaterialOnHand[0];
+            } else {
+                return undefined;
+            }
+        });
+
+        BrewOptix.on("packageMaterialOnHand:added", function (packageMaterialOnHand) {
+            packageMaterialOnHands.set(packageMaterialOnHand, { remove: false });
+            packageMaterialOnHands.trigger('reset');
+        });
+
+    });
+
+    return BrewOptix.Entities.PackageMaterialOnHand;
+});
+
