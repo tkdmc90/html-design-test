@@ -1,23 +1,27 @@
-﻿<div style="width: 500px;height: 160px">
+﻿<link rel="StyleSheet" href="../../../../../css/login.css" />
+<link rel="StyleSheet" href="login.css" />
+<div class="login-wrapper">
     <div id="login-alert" class="alert alert-error" style="display:none;">
     </div>
-    <div style="float: left; height: 100%">
-        Login with LinkedIn<br/>
-        <a href="#" id="login-linkedIn" ><img src="/images/linkedin_logo_full.png" /></a>
-        <div style="position: absolute;bottom: 5px"><a href="#" id="register-linkedIn" style="margin-top: 30px">Register with LinkedIn</a></div>
+    <div>
+        <div id="login-linkedInHeading">Login with LinkedIn</div>
+        <a href="#" id="login-linkedIn"></a>
+		<div>
+			<a href="#" id="register-linkedIn">Register with LinkedIn</a>
+		</div>
     </div>
     <div>
         <form class="form-horizontal">
             <div class="control-group">
                 <label class="control-label" for="username">Username</label>
                 <div class="controls">
-                    <input type="text" id="username" placeholder="Username">
+                    <input type="text" id="username" placeholder="Username" required="required">
                 </div>
             </div>
             <div class="control-group">
                 <label class="control-label" for="password">Password</label>
                 <div class="controls">
-                    <input type="password" id="password" placeholder="Password">
+                    <input type="password" id="password" placeholder="Password" required="required">
                 </div>
             </div>
             <div class="control-group" style="margin-top: 10px">
@@ -27,7 +31,9 @@
             </div>
             
         </form>
-        <div style="position: absolute;bottom: 5px;right: 15px"><a href="#" id="register" style="margin-left: 15px">Register</a></div>
-        <div style="position: absolute;bottom: 5px;right: 150px"><a href="#" id="resetPassword" style="margin-left: 15px">Reset Password</a></div>
+        <div style="font-size: 11px; position: relative; left: 225px; top: -62px; margin-right: 220px;">
+			<div style=""><a href="#" id="register">Register</a></div>
+			<div style=""><a href="#" id="resetPassword">Reset Password</a></div>
+        </div>
         </div>
     </div>
